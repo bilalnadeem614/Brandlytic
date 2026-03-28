@@ -1,10 +1,21 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
 @dataclass
+class FieldConfidence:
+    """Confidence score and reasoning for a single brand kit field."""
+
+    score: int
+    reason: str
+
+    def to_dict(self) -> dict:
+        return {"score": self.score, "reason": self.reason}
+
+
+@dataclass
 class BrandKit:
-    """Represents a generated brand identity package."""
+    """Represents a generated brand identity package with confidence indicators."""
 
     brand_names: list[str]
     tagline: str
@@ -14,6 +25,7 @@ class BrandKit:
     marketing_content: dict
     target_audience: str
     brand_values: list[str]
+    confidence: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -25,4 +37,5 @@ class BrandKit:
             "marketing_content": self.marketing_content,
             "target_audience": self.target_audience,
             "brand_values": self.brand_values,
+            "confidence": self.confidence,
         }
