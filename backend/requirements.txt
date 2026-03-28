@@ -1,6 +1,7 @@
 flask
 flask-cors
 python-dotenv
+google-genai>=1.0.0
 groq
 requests
 beautifulsoup4
