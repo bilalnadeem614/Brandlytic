@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 from google import genai
 from google.genai import types
 from groq import Groq
@@ -231,3 +232,53 @@ def refine_field(
     )
 
     return _parse_raw(raw)
+
+
+def generate_logo(
+    logo_concept: str,
+    brand_name: str = "",
+) -> dict:
+    """
+    Generate a logo image from a logo concept description using Imagen 3.
+
+    Args:
+        logo_concept: Text description of the logo to generate.
+        brand_name:   Optional brand name to include in the prompt.
+
+    Returns:
+        Dict with keys: image_base64 (str), mime_type (str).
+
+    Raises:
+        RuntimeError: If image generation fails.
+    """
+    prompt_parts = []
+    if brand_name:
+        prompt_parts.append(f"Logo for a brand called '{brand_name}'.")
+    prompt_parts.append(logo_concept)
+    prompt_parts.append(
+        "Professional logo design, clean vector style, transparent or white background, "
+        "suitable for branding, no text unless brand name is part of the concept."
+    )
+    prompt = " ".join(prompt_parts)
+
+    try:
+        response = _gemini_client.models.generate_images(
+            model="imagen-3.0-generate-002",
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="1:1",
+                safety_filter_level="BLOCK_LOW_AND_ABOVE",
+                person_generation="DONT_ALLOW",
+            ),
+        )
+    except Exception as e:
+        raise RuntimeError(f"Logo generation failed: {e}") from e
+
+    image = response.generated_images[0].image
+    image_base64 = base64.b64encode(image.image_bytes).decode("utf-8")
+
+    return {
+        "image_base64": image_base64,
+        "mime_type": "image/png",
+    }
