@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.services.ai_service import generate_brand_kit, refine_field
+from app.services.ai_service import generate_brand_kit, refine_field, generate_logo
 from app.services.scraper_service import scrape_website
 from app.utils.helpers import is_url, success_response, error_response
 
@@ -135,6 +135,39 @@ def refine():
         )
     except ValueError as e:
         return jsonify(error_response(str(e))[0]), 400
+    except RuntimeError as e:
+        return jsonify(error_response(str(e))[0]), 502
+
+    return jsonify(success_response(result)[0]), 200
+
+
+@brand_bp.route("/generate-logo", methods=["POST"])
+def generate_logo_route():
+    """
+    Generate a logo image from a logo concept description.
+
+    Request JSON:
+        logo_concept (str, required): Text description of the logo (from /generate).
+        brand_name   (str, optional): Brand name to include in the prompt.
+
+    Returns:
+        JSON with: image_base64 (PNG encoded as base64), mime_type.
+    """
+    body = request.get_json(silent=True)
+    if not body:
+        return jsonify(error_response("Request body must be JSON.")[0]), 400
+
+    logo_concept = body.get("logo_concept", "").strip()
+    brand_name = body.get("brand_name", "").strip()
+
+    if not logo_concept:
+        return jsonify(error_response("'logo_concept' field is required.")[0]), 400
+
+    try:
+        result = generate_logo(
+            logo_concept=logo_concept,
+            brand_name=brand_name,
+        )
     except RuntimeError as e:
         return jsonify(error_response(str(e))[0]), 502
 
