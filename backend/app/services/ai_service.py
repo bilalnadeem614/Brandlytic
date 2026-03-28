@@ -1,11 +1,15 @@
 import os
 import json
+from google import genai
+from google.genai import types
 from groq import Groq
 from app.models.brand_kit import BrandKit
 
-_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+_gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+_groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-_MODEL = "llama-3.3-70b-versatile"
+_GEMINI_MODEL = "gemini-2.0-flash"
+_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 _SYSTEM_PROMPT = """You are a world-class brand strategist and creative director.
 You generate complete, professional brand identities.
@@ -108,18 +112,48 @@ def _parse_raw(raw: str) -> dict:
         raise ValueError(f"Failed to parse AI response as JSON: {e}") from e
 
 
+def _call_gemini(messages: list[dict], temperature: float = 0.7) -> str:
+    """Make a Gemini API call and return the raw text response."""
+    system_prompt = next(
+        (m["content"] for m in messages if m["role"] == "system"), None
+    )
+    user_messages = [m for m in messages if m["role"] != "system"]
+    prompt = user_messages[-1]["content"] if user_messages else ""
+    response = _gemini_client.models.generate_content(
+        model=_GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=temperature,
+            max_output_tokens=1800,
+        ),
+    )
+    return response.text.strip()
+
+
 def _call_groq(messages: list[dict], temperature: float = 0.7) -> str:
     """Make a Groq API call and return the raw text response."""
-    try:
-        response = _client.chat.completions.create(
-            model=_MODEL,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=1800,
-        )
-    except Exception as e:
-        raise RuntimeError(f"Groq API error: {e}") from e
+    response = _groq_client.chat.completions.create(
+        model=_GROQ_MODEL,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=1800,
+    )
     return response.choices[0].message.content.strip()
+
+
+def _call_ai(messages: list[dict], temperature: float = 0.7) -> str:
+    """Call Gemini with Groq as fallback."""
+    try:
+        return _call_gemini(messages, temperature)
+    except Exception as gemini_err:
+        print(f"[ai_service] Gemini failed ({gemini_err}), falling back to Groq.")
+        try:
+            return _call_groq(messages, temperature)
+        except Exception as groq_err:
+            raise RuntimeError(
+                f"Both AI providers failed. Gemini: {gemini_err} | Groq: {groq_err}"
+            ) from groq_err
 
 
 def generate_brand_kit(
@@ -142,7 +176,7 @@ def generate_brand_kit(
         ValueError: If the AI response cannot be parsed.
         RuntimeError: If the Groq API call fails.
     """
-    raw = _call_groq([
+    raw = _call_ai([
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": _build_prompt(business_input, platform, include_logo)},
     ])
@@ -186,7 +220,7 @@ def refine_field(
         ValueError: If the AI response cannot be parsed.
         RuntimeError: If the Groq API call fails.
     """
-    raw = _call_groq(
+    raw = _call_ai(
         messages=[
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": _build_refine_prompt(

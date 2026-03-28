@@ -35,25 +35,25 @@ def generate():
     """
     body = request.get_json(silent=True)
     if not body:
-        return jsonify(*error_response("Request body must be JSON."))
+        return jsonify(error_response("Request body must be JSON.")[0]), 400
 
     raw_input = body.get("input", "").strip()
     platform = body.get("platform", "general").strip().lower()
     include_logo = bool(body.get("logo", False))
 
     if not raw_input:
-        return jsonify(*error_response("'input' field is required."))
+        return jsonify(error_response("'input' field is required.")[0]), 400
     if platform not in _VALID_PLATFORMS:
-        return jsonify(*error_response(
+        return jsonify(error_response(
             f"Invalid platform. Must be one of: {', '.join(_VALID_PLATFORMS)}."
-        ))
+        )[0]), 400
 
     business_input = raw_input
     if is_url(raw_input):
         try:
             business_input = scrape_website(raw_input)
         except ValueError as e:
-            return jsonify(*error_response(str(e)))
+            return jsonify(error_response(str(e))[0]), 400
 
     try:
         brand_kit = generate_brand_kit(
@@ -62,11 +62,11 @@ def generate():
             include_logo=include_logo,
         )
     except ValueError as e:
-        return jsonify(*error_response(str(e)))
+        return jsonify(error_response(str(e))[0]), 400
     except RuntimeError as e:
-        return jsonify(*error_response(str(e), status=502))
+        return jsonify(error_response(str(e))[0]), 502
 
-    return jsonify(*success_response(brand_kit.to_dict()))
+    return jsonify(success_response(brand_kit.to_dict())[0]), 200
 
 
 @brand_bp.route("/refine", methods=["POST"])
@@ -92,7 +92,7 @@ def refine():
     """
     body = request.get_json(silent=True)
     if not body:
-        return jsonify(*error_response("Request body must be JSON."))
+        return jsonify(error_response("Request body must be JSON.")[0]), 400
 
     raw_input = body.get("input", "").strip()
     platform = body.get("platform", "general").strip().lower()
@@ -101,21 +101,21 @@ def refine():
     rejection_reason = body.get("rejection_reason", "").strip()
 
     if not raw_input:
-        return jsonify(*error_response("'input' field is required."))
+        return jsonify(error_response("'input' field is required.")[0]), 400
     if platform not in _VALID_PLATFORMS:
-        return jsonify(*error_response(
+        return jsonify(error_response(
             f"Invalid platform. Must be one of: {', '.join(_VALID_PLATFORMS)}."
-        ))
+        )[0]), 400
     if not field:
-        return jsonify(*error_response("'field' is required."))
+        return jsonify(error_response("'field' is required.")[0]), 400
     if field not in _VALID_FIELDS:
-        return jsonify(*error_response(
+        return jsonify(error_response(
             f"Invalid field. Must be one of: {', '.join(_VALID_FIELDS)}."
-        ))
+        )[0]), 400
     if not rejected_value:
-        return jsonify(*error_response("'rejected_value' is required."))
+        return jsonify(error_response("'rejected_value' is required.")[0]), 400
     if not rejection_reason:
-        return jsonify(*error_response("'rejection_reason' is required."))
+        return jsonify(error_response("'rejection_reason' is required.")[0]), 400
 
     # Resolve URL to text if needed
     business_input = raw_input
@@ -123,7 +123,7 @@ def refine():
         try:
             business_input = scrape_website(raw_input)
         except ValueError as e:
-            return jsonify(*error_response(str(e)))
+            return jsonify(error_response(str(e))[0]), 400
 
     try:
         result = refine_field(
@@ -134,8 +134,8 @@ def refine():
             rejection_reason=rejection_reason,
         )
     except ValueError as e:
-        return jsonify(*error_response(str(e)))
+        return jsonify(error_response(str(e))[0]), 400
     except RuntimeError as e:
-        return jsonify(*error_response(str(e), status=502))
+        return jsonify(error_response(str(e))[0]), 502
 
-    return jsonify(*success_response(result))
+    return jsonify(success_response(result)[0]), 200
